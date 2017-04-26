@@ -1,0 +1,11 @@
+{
+  "name": "vpc-flow-log-appender",
+  "version": "1.0.0",
+  "description": "Appends security group and additional details for use by Elastic Serach and VPC flow logs",
+  "main": "index.js",
+  "author": "jkahn@",
+  "license": "Apache2.0",
+  "dependencies": {
+    "aws-sdk": "^2.25.0"
+  }
+}
