@@ -14,7 +14,7 @@ The following diagram is a representation of the AWS services and components inv
 To get started, clone this repository locally:
 
 ```
-$ git clone https://github.com/jkahn117/vpc-flow-log-appender.git
+$ git clone https://github.com/awslabs/aws-vpc-flow-log-appender.git
 ```
 
 The repository contains [CloudFormation](https://aws.amazon.com/cloudformation/) templates and source code to deploy and run the sample application.
