@@ -82,7 +82,7 @@ const createRecordsFromEvents = (events) => {
 
         // catch at 500 records and push to firehose
         if (records.length > 499) {
-          this.putRecords(records);
+          putRecords(records);
           records = [];
         }
       }, this);
