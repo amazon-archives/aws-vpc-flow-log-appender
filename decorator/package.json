@@ -4,9 +4,9 @@
   "description": "Appends security group and additional details for use by Elastic Serach and VPC flow logs",
   "main": "index.js",
   "author": "jkahn@",
-  "license": "Apache2.0",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/awslabs/aws-vpc-flow-log-appender",
   "dependencies": {
-    "aws-sdk": "^2.25.0",
     "jmespath": "^0.15.0",
     "lodash": "^4.17.4"
   }

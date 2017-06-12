@@ -44,7 +44,7 @@ module.exports = (ipAddress) => {
        * response here so that execution can continue otherwise.
        */
       if (res.statusCode === 403) {
-        console.error('[geocoder] Exceeded rate limit');
+        console.warn('[geocoder] Exceeded rate limit');
         resolve(null);
         return;
       }
