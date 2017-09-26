@@ -5,7 +5,7 @@
 # except in compliance with the License. A copy of the License is located at
 #
 #    http://aws.amazon.com/apache2.0/
-# 
+#
 # or in the "license" file accompanying this file. This file is distributed on an "AS IS"
 # BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations under the License.
@@ -22,7 +22,7 @@ Description: "AWS VPC Flow Log Appender services"
 Resources:
   #
   # -- Data Ingestion --
-  # 
+  #
   # Data is received from CloudWatch Logs and pushed to Kinesis Firehose.
   #
   FlowLogIngestionFunction:
@@ -68,12 +68,12 @@ Resources:
           -
             Sid: "AllowLambdaServiceToAssumeRole"
             Effect: "Allow"
-            Action: 
+            Action:
               - "sts:AssumeRole"
             Principal:
-              Service: 
+              Service:
                 - "lambda.amazonaws.com"
-      
+
 
   #
   # IAM Policy for Firehose Delivery
@@ -87,11 +87,21 @@ Resources:
       PolicyName: "LambdaFirehoseDeliveryPolicy"
       Roles:
         - !Ref LambdaFirehoseDeliveryRole
-      PolicyDocument: 
+      PolicyDocument:
         Version: "2012-10-17"
-        Statement: 
+        Statement:
           -
             Effect:   "Allow"
             Action:   "firehose:PutRecordBatch"
             Resource: !Sub "arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*"
 
+Outputs:
+ LambdaFlowLogDecorator:
+   Value: !GetAtt FlowLogDecoratorFunction.Arn
+   Export:
+     Name: 'FlowLogDecoratorFunction'
+
+ LambdaFlowLogIngestion:
+   Value: !GetAtt FlowLogIngestionFunction.Arn
+   Export:
+     Name: 'FlowLogIngestionFunction'
