@@ -40,6 +40,7 @@ $ cd ../ingestor
 $ npm install
 $ cd ..
 ```
+Repeat this for the decorator function as well.
 
 ## Deploy Lambda Functions
 
