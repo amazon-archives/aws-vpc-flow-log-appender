@@ -7,7 +7,8 @@
   "license": "Apache-2.0",
   "repository": "https://github.com/awslabs/aws-vpc-flow-log-appender",
   "dependencies": {
+    "axios": "^0.18.0",
     "jmespath": "^0.15.0",
-    "lodash": "^4.17.4"
+    "lodash.find": "^4.6.0"
   }
 }

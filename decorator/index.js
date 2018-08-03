@@ -32,26 +32,26 @@ License for the specific language governing permissions and limitations under th
  * 
  */
 
-const _ = require('lodash');
-const AWS = require('aws-sdk');
+const find = require('lodash.find');
+const EC2 = require('aws-sdk/clients/ec2');
 const jmespath = require('jmespath');
 const geocode = require('./geocode');
-
-AWS.config.update({ region: process.env.AWS_REGION });
 
 /**
  * Regular expression to parse VPC Flow Log format.
  */
 const parser = /^(\d) (\d+) (eni-\w+) (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}) (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (\d+) (ACCEPT|REJECT) (OK|NODATA|SKIPDATA)/
 
+let ec2 = null;
+
 /**
  * Describes the Network Interfaces associated with this account.
  * 
  * @return `Promise` for async processing
  */
-const listNetworkInterfaces = () => {
-  const ec2 = new AWS.EC2()
-  return ec2.describeNetworkInterfaces().promise()
+const listNetworkInterfaces = async () => {
+  if (!ec2) { ec2 = new EC2({ region: process.env.AWS_REGION }) }
+  return ec2.describeNetworkInterfaces().promise();
 };
 
 /**
@@ -79,19 +79,17 @@ const listNetworkInterfaces = () => {
  *    ...
  *  ]
  */
-const buildEniToSecurityGroupMapping = () => {
-  return listNetworkInterfaces()
-    .then( (interfaces) => {
-      return new Promise( (resolve, reject) => {
-        let mapping = jmespath.search(interfaces,
-            `NetworkInterfaces[].{
-              interfaceId: NetworkInterfaceId,
-              securityGroupIds: Groups[].GroupId,
-              ipAddress: PrivateIpAddresses[?Primary].PrivateIpAddress
-            }`)
-        resolve(mapping)
-      });
-    })
+const buildEniToSecurityGroupMapping = async () => {
+  let interfaces = await listNetworkInterfaces()
+    
+  let mapping = jmespath.search(interfaces,
+    `NetworkInterfaces[].{
+      interfaceId: NetworkInterfaceId,
+      securityGroupIds: Groups[].GroupId,
+      ipAddress: PrivateIpAddresses[?Primary].PrivateIpAddress
+    }`);
+  
+  return Promise.resolve(mapping);
 }
 
 /**
@@ -102,13 +100,13 @@ const buildEniToSecurityGroupMapping = () => {
  * 
  * @param oRecords - records from Kinesis Firehose to be processed
  */
-const extractRecords = (oRecords) => {
-  let records = []
-  oRecords.forEach( (record) => {
+const extractRecords = async (records) => {
+  let result = []
+  for(let record of records) {
     let flowLogData = Buffer.from(record.data, 'base64').toString('utf8')
     let match = parser.exec(flowLogData)
     if (match) {
-      let result = {
+      let matched = {
         // default vpc flow log data
         '@timestamp':    new Date(),
         'version':       Number(match[1]),
@@ -127,21 +125,31 @@ const extractRecords = (oRecords) => {
         'log-status':    match[14]
       }
 
-      records.push({
+      result.push({
         id: record.recordId,
-        data: result,
+        data: matched,
         error: false
       })
     } else {
-      records.push({
+      result.push({
         id: record.recordId,
         data: record.data,
         error: true
       })
     }
-  }, this)
+  }
 
-  return Promise.resolve(records)
+  return Promise.resolve(result)
+}
+
+/**
+ * Tests if the passed IP address meets RFC1918 guidelines, e.g. private ip address.
+ * @param {*} ipAddress 
+ */
+const isRfc1918Address = (ipAddress) => {
+  let re = /(^127\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)/;
+
+  return (ipAddress.match(re) !== null);
 }
 
 /**
@@ -152,13 +160,11 @@ const extractRecords = (oRecords) => {
  * @param mapping - mapping of ENIs to additional data
  * @return `Promise` for async processing
  */
-const decorateRecords = (records, mapping) => {
-  let promises = [];
-
+const decorateRecords = async (records, mapping) => {
   console.log(`Decorating ${records.length} records`)
 
-  records.forEach( (record) => {
-    let eniData = _.find(mapping, { 'interfaceId': record.data['interface-id'] });
+  for(let record of records) {
+    let eniData = find(mapping, { 'interfaceId': record.data['interface-id'] });
     if (eniData) {
       record.data['security-group-ids'] = eniData.securityGroupIds;
       record.data['direction'] = (record.data['destaddr'] == eniData.ipAddress) ? 'inbound' : 'outbound';
@@ -166,34 +172,27 @@ const decorateRecords = (records, mapping) => {
       console.log(`No ENI data found for interface ${record.data['interface-id']}`);
     }
 
-    // TODO: add switch for geocode or no
-    promises.push(
-      geocode(record.data['srcaddr'])
-        .then( (geo) => {
-          record.data['source-country-code'] = geo ? geo.country_code : ''
-          record.data['source-country-name'] = geo ? geo.country_name : ''
-          record.data['source-region-code']  = geo ? geo.region_code : ''
-          record.data['source-region-name']  = geo ? geo.region_name : ''
-          record.data['source-city']         = geo ? geo.city : ''
-          record.data['source-location']     = {
-            lat: geo ? Number(geo.latitude) : 0,
-            lon: geo ? Number(geo.longitude) : 0
-          }
+    let srcaddr = record.data['srcaddr'];
+    if (process.env.GEOLOCATION_ENABLED === 'true' && !isRfc1918Address(srcaddr)) {
+      let geo = await geocode(srcaddr)
 
-          return Promise.resolve(record)
-        })
-        .catch( () => {
-          // If geocoder fails, return record itself
-          return Promise.resolve(record)
-        })
-    )     
-  }, this)
+      // append geo data to existing record
+      record.data['source-country-code'] = geo ? geo.country_code : ''
+      record.data['source-country-name'] = geo ? geo.country_name : ''
+      record.data['source-region-code']  = geo ? geo.region_code : ''
+      record.data['source-region-name']  = geo ? geo.region_name : ''
+      record.data['source-city']         = geo ? geo.city : ''
+      record.data['source-location']     = {
+        lat: geo ? Number(geo.latitude) : 0,
+        lon: geo ? Number(geo.longitude) : 0
+      }
+    }
 
-  return Promise.all(promises)
-    .then( (results) => {
-      console.log(`Finished with ${results.length} records`)
-      return Promise.resolve(results)
-    });
+    // console.log(JSON.stringify(record))
+  }
+
+  console.log(`Finished with ${records.length} records`)
+  return Promise.resolve(records)
 };
 
 /**
@@ -203,17 +202,14 @@ const decorateRecords = (records, mapping) => {
  * 
  * @param records - records to be packaged
  */
-const packageRecords = (records) => {
+const packageRecords = async (records) => {
   let result = []
   let success = 0
   let failure = 0
 
-  console.log(`packaging ${records.length} records`)
+  console.log(`Packaging ${records.length} records`)
 
-  records.forEach( (record) => {
-
-    console.log(record)
-
+  for(let record of records) {
     if (record.error) {
       result.push({
         recordId: record.id,
@@ -230,7 +226,7 @@ const packageRecords = (records) => {
       })
       success++
     }
-  })
+  }
 
   console.log(`Processing completed.  Successful records ${success}, Failed records ${failure}.`);
   return Promise.resolve(result)
