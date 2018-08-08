@@ -63,13 +63,16 @@ Resources:
       Timeout: 120
       CodeUri: decorator/
       Policies:
-        - EC2DescribePolicy: {}
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
               Action:
                 - "ssm:GetParameter"
               Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ipstack-api-key"
+            - Effect: Allow
+              Action:
+                - "ec2:DescribeNetworkInterfaces"
+              Resource: "*"
       Environment:
         Variables:
           GEOLOCATION_ENABLED: !Ref GeolocationEnabled

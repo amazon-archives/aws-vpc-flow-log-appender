@@ -1,4 +1,8 @@
-package-lock.json
-node_modules
-packaged.yaml
+
 .DS_Store
+packaged.yaml
+node_modules
+package-lock.json
+parameters.properties
+
+**/node_modules
