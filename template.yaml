@@ -21,7 +21,7 @@ Description: "AWS VPC Flow Log Appender services"
 Parameters:
   GeolocationEnabled:
     Type: String
-    Default: false
+    Default: true
     AllowedValues:
       - true
       - false
@@ -71,7 +71,7 @@ Resources:
               Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ipstack-api-key"
             - Effect: Allow
               Action:
-                - "ec2:DescribeNetworkInterfaces"
+                - "ec2:Describe*"
               Resource: "*"
       Environment:
         Variables:

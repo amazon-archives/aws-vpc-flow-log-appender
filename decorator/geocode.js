@@ -57,9 +57,10 @@ module.exports = async (ipAddress) => {
   if (!apiKey) { apiKey = await getApiKey() }
 
   let response = await axios.get(`http://${serviceHost}/${ipAddress}?access_key=${apiKey}`)
-  if (response.status !== 200) {
-    console.warn('[geocode] received bad response' +res.statusText);
-    return Promise.reject(null);
+  console.log(JSON.stringify(response.data))
+  if (response.status !== 200 || !response.data.success) {
+    console.warn('[geocode] received bad response: ' +response.statusText);
+    return Promise.reject(`ipstack - ${response.statusText} - ${JSON.stringify(response.data.error)}`);
   } else {
     return Promise.resolve(response.data);
   }

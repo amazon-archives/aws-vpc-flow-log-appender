@@ -173,8 +173,10 @@ const decorateRecords = async (records, mapping) => {
     }
 
     let srcaddr = record.data['srcaddr'];
-    if (process.env.GEOLOCATION_ENABLED === 'true' && !isRfc1918Address(srcaddr)) {
-      let geo = await geocode(srcaddr)
+    if (process.env.GEOLOCATION_ENABLED === 'true') {
+      let geo = isRfc1918Address(srcaddr) ? null : await geocode(srcaddr)
+
+      if (geo) console.log(JSON.stringify(geo))
 
       // append geo data to existing record
       record.data['source-country-code'] = geo ? geo.country_code : ''
@@ -188,7 +190,7 @@ const decorateRecords = async (records, mapping) => {
       }
     }
 
-    // console.log(JSON.stringify(record))
+    console.log(JSON.stringify(record))
   }
 
   console.log(`Finished with ${records.length} records`)
