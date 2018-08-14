@@ -173,23 +173,22 @@ const decorateRecords = async (records, mapping) => {
     }
 
     let srcaddr = record.data['srcaddr'];
-    if (process.env.GEOLOCATION_ENABLED === 'true') {
-      let geo = isRfc1918Address(srcaddr) ? null : await geocode(srcaddr)
+    let geo = process.env.GEOLOCATION_ENABLED === 'false'
+                || isRfc1918Address(srcaddr) ? null : await geocode(srcaddr)
 
-      if (geo) console.log(JSON.stringify(geo))
+    if (geo) console.log(JSON.stringify(geo))
 
-      // append geo data to existing record
-      record.data['source-country-code'] = geo ? geo.country_code : ''
-      record.data['source-country-name'] = geo ? geo.country_name : ''
-      record.data['source-region-code']  = geo ? geo.region_code : ''
-      record.data['source-region-name']  = geo ? geo.region_name : ''
-      record.data['source-city']         = geo ? geo.city : ''
-      record.data['source-location']     = {
-        lat: geo ? Number(geo.latitude) : 0,
-        lon: geo ? Number(geo.longitude) : 0
-      }
+    // append geo data to existing record
+    record.data['source-country-code'] = geo ? geo.country_code : ''
+    record.data['source-country-name'] = geo ? geo.country_name : ''
+    record.data['source-region-code']  = geo ? geo.region_code : ''
+    record.data['source-region-name']  = geo ? geo.region_name : ''
+    record.data['source-city']         = geo ? geo.city : ''
+    record.data['source-location']     = {
+      lat: geo ? Number(geo.latitude) : 0,
+      lon: geo ? Number(geo.longitude) : 0
     }
-
+    
     console.log(JSON.stringify(record))
   }
 
