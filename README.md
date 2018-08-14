@@ -8,7 +8,7 @@ The following diagram is a representation of the AWS services and components inv
 
 ![VPC Flow Log Appender Services](vpc-flow-log-appender.png)
 
-**NOTE:** This project makes use of a free geolocation service ([http://freegeoip.net/](http://freegeoip.net/) that enforces an hourly limit of 15,000 requests.  It is not *intended for use in a production environment*. We recommend using a commercial source of IP geolocation data if you wish to run this code in such an environment.
+**NOTE:** This project makes use of a free tier of the [ipstack](http://ipstack.com/) geolocation service that enforces a montly limit of 10,000 requests.  It is not *intended for use in a production environment*. We recommend using one of ipstack's paid plans or another commercial source of IP geolocation data if you wish to run this code in such an environment.
 
 ## Getting Started
 
@@ -25,45 +25,70 @@ The repository contains [CloudFormation](https://aws.amazon.com/cloudformation/)
 To run the vpc-flow-log-appender sample, you will need to:
 
 1. Select an AWS Region into which you will deploy services. Be sure that all required services (AWS Lambda, Amazon Elastisearch Service, AWS CloudWatch, and AWS Kinesis Firehose) are available in the Region you select.
-2. Confirm your [installation of the latest AWS CLI](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) (at least version 1.11.21).
-3. Confirm the [AWS CLI is properly configured](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-quick-configuration) with credentials that have administrator access to your AWS account.
+2. Confirm your [installation of the latest AWS CLI](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) and that [it is properly configured](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-quick-configuration) with credentials that have appropriate access to your account.
+3. [Install aws-sam-cli](https://github.com/awslabs/aws-sam-cli).
 4. [Install Node.js and NPM](https://docs.npmjs.com/getting-started/installing-node).
+
+## Configure Geolocation
+
+If you would like to geolocate the source IP address of traffic in your VPC flow logs, you can configure a free account at ipstack.com. Note that the free tier of this service is *not* intended for production use.
+
+To sign-up for a free account at ipstack.com, visit https://ipstack.com/signup/free to obtain an API key.
+
+Once you have obtained your API key, store it in EC2 Systems Manager Parameter Store as follows (replace MY_API_KEY with your own):
+
+``` bash
+$ aws ssm put-parameter \
+      --name ipstack-api-key \
+      --value MY_API_KEY \
+      --type SecureString
+```
 
 ## Preparing to Deploy Lambda
 
 Before deploying the sample, install several dependencies using NPM:
 
-```
-$ cd vpc-flow-log-appender/decorator
-$ npm install
-$ cd ../ingestor
-$ npm install
-$ cd ..
+``` bash
+$ cd decorator && npm install
+$ cd ../ingestor && npm install && cd ..
 ```
 
 ## Deploy Lambda Functions
 
-The deployment of our AWS resources is managed by a CloudFormation template using AWS Serverless Application Model.
+The deployment of our AWS resources is managed by the [AWS SAM CLI](https://github.com/awslabs/aws-sam-cli) using the [AWS Serverless Application Model](https://github.com/awslabs/serverless-application-model) (SAM).
 
 1. Create a new S3 bucket from which to deploy our source code (ensure that the bucket is created in the same AWS Region as your network and services will be deployed):
 
-    ```
+    ``` bash
     $ aws s3 mb s3://<MY_BUCKET_NAME>
     ```
 
 2. Using the Serverless Application Model, package your source code and serverless stack:
 
-    ```
-    $ aws cloudformation package --template-file app-sam.yaml --s3-bucket <MY_BUCKET_NAME> --output-template-file app-sam-output.yaml
+    ``` bash
+    $ sam package --template-file template.yaml \
+                  --s3-bucket <MY_BUCKET_NAME> \
+                  --output-template-file packaged.yaml
     ```
 
 3. Once packaging is complete, deploy the stack:
 
-    ```
-    $ aws cloudformation deploy --template-file app-sam-output.yaml --stack-name vpc-flow-log-appender-dev --capabilities CAPABILITY_IAM
+    ``` bash
+    $ sam deploy --template-file packaged.yaml \
+                 --stack-name vpc-flow-log-appender \
+                 --capabilities CAPABILITY_IAM
     ```
 
- 4. Once we have deployed our Lambda functions, we need to return to CloudWatch and configure VPC Flow Logs to stream the data to the Lambda function. (TODO: add more detail)
+    Or to deploy with the geolocation feature turned on:
+
+    ``` bash
+    $ sam deploy --template-file packaged.yaml \
+                 --stack-name vpc-flow-log-appender \
+                 --capabilities CAPABILITY_IAM \
+                 --parameter-overrides GeolocationEnabled=true
+    ```
+
+ 4. Once we have deployed our Lambda functions, configure CloudWatch logs to stream VPC Flow Logs to Elasticsearch as described [here](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_ES_Stream.html).
 
 ## Testing
 
@@ -84,7 +109,8 @@ When ready:
     $ aws sts get-caller-identity --query 'Account'
 
     # ENI_ID (e.g. "eni-1a2b3c4d")
-    $ aws ec2 describe-instances --query 'Reservations[0].Instances[0].NetworkInterfaces[0].NetworkInterfaceId'
+    $ aws ec2 describe-instances \
+              --query 'Reservations[0].Instances[0].NetworkInterfaces[0].NetworkInterfaceId'
     ```
 
 4. Finally, we can build a template for KDG using the following.  Be sure to replace `<<ACOUNT_ID>>` and `<<ENI_ID>>` with the values your captured in step 3 (do not include quotes).
@@ -115,6 +141,7 @@ $ aws cloudformation delete-stack --stack-name vpc-flow-log-appender-dev
 
 ## Updates
 
+* Aug 2 2018 - Updated decorator function and geocode modue to use ipstacks as previous service is now defunct. Amended README to include new instructions on using ipstacks.
 * Jun 9 2017 - Fixed issue in which decorator did not return all records to Firehose when geocoder was over 15,000 per hour limit. Instead, will return blank geo data. Added Test methodology.
 
 ## Authors

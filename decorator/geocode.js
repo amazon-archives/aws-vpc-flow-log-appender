@@ -22,53 +22,47 @@ License for the specific language governing permissions and limitations under th
  */
 
 const http = require('http');
+const SSM = require('aws-sdk/clients/ssm');
+const axios = require('axios');
 
-const serviceHost = 'freegeoip.net';
-const servicePath = '/json';
+const serviceHost = 'api.ipstack.com';
 
-module.exports = (ipAddress) => {
-  let options = {
-    hostname: serviceHost,
-    path:     `${servicePath}/${ipAddress}`,
-    headers:  {
-                'Content-Type': 'application/json'
-              }
-  };
+let ssm = null;
+let apiKey = null;
 
-  return new Promise( (resolve, reject) => {
+/**
+ * 
+ */
+const getApiKey = async() => {
+  if (!ssm) { ssm = new SSM({ region: process.env.AWS_REGION }) }
 
-    http.get(options, (res) => {
-      /**
-       * When the geocoding service returns a 403, we have exceeded the rate
-       * limit allowed. Instead of throwing an error, just return a null
-       * response here so that execution can continue otherwise.
-       */
-      if (res.statusCode === 403) {
-        console.warn('[geocoder] Exceeded rate limit');
-        resolve(null);
-        return;
-      }
-      else if (res.statusCode !== 200) {
-        console.error('[geocoder] Received bad error code ' +res.statusCode);
-        reject( new Error(`Request failed with status code ${res.statusCode}`) );
-        return;
-      }
+  const params = {
+    Name: process.env.GEOLOCATION_API_KEY_NAME,
+    WithDecryption: true
+  }
 
-      res.setEncoding('utf8');
-      let data = '';
-      res.on('data', (chunk) => data += chunk );
-      res.on('end',  () => {
-        try {
-          let json = JSON.parse(data);
-          resolve(json);
-        } catch(e) {
-          reject(e);
-        }
-      });
-    })
-    .on('error', (e) => {
-      reject(e);
-    });
+  let result = await ssm.getParameter(params).promise()
+  if (result && result.Parameter) {
+    return result.Parameter.Value
+  } else {
+    throw Error(`API key not found in SSM (${process.env.GEOLOCATION_API_KEY_NAME})`)
+  }
+}
 
-  });
+/**
+ * 
+ * @param {String} ipAddress 
+ */
+module.exports = async (ipAddress) => {
+  if (!apiKey) { apiKey = await getApiKey() }
+
+  let response = await axios.get(`http://${serviceHost}/${ipAddress}?access_key=${apiKey}`)
+  console.log(JSON.stringify(response.data))
+  console.log(response.data.success)
+  if (response.status !== 200 || response.data.hasOwnProperty('error')) {
+    console.warn('[geocode] received bad response: ' +response.statusText);
+    return Promise.reject(`ipstack - ${response.statusText} - ${JSON.stringify(response.data.error)}`);
+  } else {
+    return Promise.resolve(response.data);
+  }
 }

@@ -18,6 +18,13 @@ Transform: "AWS::Serverless-2016-10-31"
 
 Description: "AWS VPC Flow Log Appender services"
 
+Parameters:
+  GeolocationEnabled:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
 
 Resources:
   #
@@ -31,10 +38,17 @@ Resources:
       Handler: "index.handler"
       Runtime: "nodejs6.10"
       CodeUri: "ingestor/"
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            -
+              Effect: Allow
+              Action:
+                - "firehose:PutRecordBatch"
+              Resource: !Sub "arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*"
       Environment:
         Variables:
           DELIVERY_STREAM_NAME: "VPCFlowLogsToElasticSearch"
-      Role: !GetAtt LambdaFirehoseDeliveryRole.Arn
 
   #
   # -- Decorator --
@@ -42,58 +56,27 @@ Resources:
   # Appends VPC Flow Logs with additional data, including instance security groups.
   #
   FlowLogDecoratorFunction:
-    Type: "AWS::Serverless::Function"
+    Type: AWS::Serverless::Function
     Properties:
-      Handler: "index.handler"
-      Runtime: "nodejs6.10"
+      Handler: index.handler
+      Runtime: nodejs8.10
       Timeout: 120
-      CodeUri: "decorator/"
+      CodeUri: decorator/
       Policies:
-        - "AWSLambdaBasicExecutionRole"
-        - "AmazonEC2ReadOnlyAccess"
-
-
-  #
-  # IAM Role for Firehose Delivery
-  #
-  LambdaFirehoseDeliveryRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      Path: "/"
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Sid: "AllowLambdaServiceToAssumeRole"
-            Effect: "Allow"
-            Action:
-              - "sts:AssumeRole"
-            Principal:
-              Service:
-                - "lambda.amazonaws.com"
-
-
-  #
-  # IAM Policy for Firehose Delivery
-  #
-  # NOTE: for demo, this policy is overly permissive
-  #
-  LambdaFirehoseDeliveryPolicy:
-    Type: "AWS::IAM::Policy"
-    DependsOn: "LambdaFirehoseDeliveryRole"
-    Properties:
-      PolicyName: "LambdaFirehoseDeliveryPolicy"
-      Roles:
-        - !Ref LambdaFirehoseDeliveryRole
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          -
-            Effect:   "Allow"
-            Action:   "firehose:PutRecordBatch"
-            Resource: !Sub "arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*"
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - "ssm:GetParameter"
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ipstack-api-key"
+            - Effect: Allow
+              Action:
+                - "ec2:Describe*"
+              Resource: "*"
+      Environment:
+        Variables:
+          GEOLOCATION_ENABLED: !Ref GeolocationEnabled
+          GEOLOCATION_API_KEY_NAME: ipstack-api-key
 
 Outputs:
  LambdaFlowLogDecorator:
