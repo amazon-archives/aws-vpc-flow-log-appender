@@ -21,7 +21,7 @@ Description: "AWS VPC Flow Log Appender services"
 Parameters:
   GeolocationEnabled:
     Type: String
-    Default: true
+    Default: false
     AllowedValues:
       - true
       - false
