@@ -2,13 +2,13 @@
 
 aws-vpc-flow-log-appender is a sample project that enriches AWS [VPC Flow Log](http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/flow-logs.html) data with additional information, primarily the Security Groups associated with the instances to which requests are flowing.
 
-This project makes use of several AWS services, including Elasticsearch, Lambda, and Kinesis Firehose.  These **must** be setup and configured in the proper sequence for the sample to work as expected.  Here, we describe deployment of the Lambda components only.  For details on deploying and configuring other services, please see the accompanying [blog post](https://aws.amazon.com/blogs/security/how-to-optimize-and-visualize-your-security-groups/).
+This project makes use of several AWS services, including Elasticsearch, Lambda, and Kinesis Firehose.  These **must** be setup and configured in the proper sequence for the sample to work as expected.  Here, we describe deployment of the Lambda components only.  For details on deploying and configuring other services, please see the accompanying [blog post](https://aws.amazon.com/blogs/security/how-to-visualize-and-refine-your-networks-security-by-adding-security-group-ids-to-your-vpc-flow-logs/).
 
 The following diagram is a representation of the AWS services and components involved in this sample:
 
 ![VPC Flow Log Appender Services](vpc-flow-log-appender.png)
 
-**NOTE:** This project makes use of a free geolocation service ([http://ipstack.com/](http://ipstack.com/) that enforces a montly limit of 10,000 requests.  It is not *intended for use in a production environment*. We recommend using one of ipstack's paid plans or another commercial source of IP geolocation data if you wish to run this code in such an environment.
+**NOTE:** This project makes use of a free tier of the [ipstack](http://ipstack.com/) geolocation service that enforces a montly limit of 10,000 requests.  It is not *intended for use in a production environment*. We recommend using one of ipstack's paid plans or another commercial source of IP geolocation data if you wish to run this code in such an environment.
 
 ## Getting Started
 
