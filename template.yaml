@@ -36,7 +36,7 @@ Resources:
     Type: "AWS::Serverless::Function"
     Properties:
       Handler: "index.handler"
-      Runtime: "nodejs6.10"
+      Runtime: "nodejs10.x"
       CodeUri: "ingestor/"
       Policies:
         - Version: "2012-10-17"
